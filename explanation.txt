@@ -1,0 +1,14 @@
+Columns are ROIs (clusters defined on anatomical x, y, z coordinates)
+and each row is an individual from the study.
+The first three columns are different, though:
+first is subject ID,
+second is diagnosis (consider aami to be the same as nc),
+and third is conversion status — 0 if the person did not develop dementia during the study period, 1 if he did.
+
+The first step:
+1. bootstrap correlations for all ROIs using only the normal controls (nc and aami).
+2. Then we can identify which ROIs are “connected” in the normal population.
+
+The second step:
+1. look at which variables mediate the relationships between those same ROIs in the mci group.
+I think for that we may use a permutation analysis, unless you can think of a superior (?Bayesian) way to do it.
