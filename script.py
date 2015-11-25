@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-def main_part():
+def main_part(num_perms=3, cut_off=.9, output_file=None):
   data = pd.read_csv("ROI_matrix.txt", sep="\t")
 
   is_normal = np.logical_or(data.dx=='nc', data.dx=='aami')
@@ -12,7 +12,6 @@ def main_part():
 
   normal_rois = normals.loc[:, normals.columns[3:]]
 
-  num_perms = 3
   maxes = sorted_permutations(normal_rois.get_values(), num_perms)
 
   normal_rois_cov = np.corrcoef(normal_rois.T)
@@ -20,7 +19,12 @@ def main_part():
                                  index=normal_rois.columns,
                                  columns=normal_rois.columns)
 
-  return connections_above(maxes, .9, normal_rois_cov)
+  valid_connections = connections_above(maxes, cut_off, normal_rois_cov)
+
+  if output_file is not None:
+    valid_connections.to_csv(output_file)
+
+  return valid_connections
 
 
 def connections_above(sorted_distribution, cut_off, connection_df):
