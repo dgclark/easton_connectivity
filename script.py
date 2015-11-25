@@ -60,49 +60,6 @@ def corr_with_shuffle(mat, shuffle_indexes, col_index):
   return corrs
 
 
-def pop_col(mat, index):
-  """
-  :param mat:
-  :param index:
-  :return col, transformed_mat:
-  >>> import numpy as np
-  >>> import pandas as pd
-  >>> mat = pd.DataFrame(np.array([[1, 2, 3], [4, 5, 6]]), columns=['a', 'b', 'c'])
-  >>> col, mat_t = pop_col(mat, 2)
-  >>> expected_mat = np.array([[1, 2], [4, 5]])
-  >>> assert(np.all(mat_t.get_values() == expected_mat))
-  >>> assert(np.all(col.get_values() == np.array([3, 6])))
-  >>> col, mat_t = pop_col(mat, 1)
-  >>> expected_mat = np.array([[1, 3], [4, 6]])
-  >>> assert(np.all(mat_t.get_values() == expected_mat))
-  >>> assert(np.all(col.get_values() == np.array([2, 5])))
-  >>> col, mat_t = pop_col(mat, 0)
-  >>> expected_mat = np.array([[2, 3], [5, 6]])
-  >>> assert(np.all(mat_t.get_values() == expected_mat))
-  >>> assert(np.all(col.get_values() == np.array([1, 4])))
-  """
-  left = mat.iloc[:, 0:index]
-  right = mat.iloc[:, (index + 1):]
-  col = mat.iloc[:, index]
-  return col, pd.concat((left, right), axis = 1)
-
-
-def shuffle_rows(indexes, col):
-  """
-  :param indexes:
-  :param col:
-  :return shuffled:
-  >>> indexes = [0, 2, 1]
-  >>> import numpy as np
-  >>> import pandas as pd
-  >>> x = pd.Series(np.array([1, 2, 3]), index=['a', 'b', 'c'])
-  >>> y = shuffle_rows(indexes, x)
-  >>> expected = np.array([1, 3, 2])
-  >>> assert(np.all(y.get_values() == expected))
-  """
-  return col.iloc[indexes]
-
-
 if __name__ == "__main__":
   import doctest
   doctest.testmod()
