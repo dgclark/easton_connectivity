@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 
-def main_part(num_perms=3, cut_off=.9, output_file=None):
+def main_part(num_perms=3, cut_off=.9, output_file=None, verbose=True):
   data = pd.read_csv("ROI_matrix.txt", sep="\t")
 
   is_normal = np.logical_or(data.dx=='nc', data.dx=='aami')
@@ -12,7 +12,7 @@ def main_part(num_perms=3, cut_off=.9, output_file=None):
 
   normal_rois = normals.loc[:, normals.columns[3:]]
 
-  maxes = sorted_permutations(normal_rois.get_values(), num_perms)
+  maxes = sorted_permutations(normal_rois.get_values(), num_perms, verbose)
 
   normal_rois_cov = np.corrcoef(normal_rois.T)
   normal_rois_cov = pd.DataFrame(normal_rois_cov,
@@ -66,7 +66,7 @@ def cutoff_value(sorted_arr, cut_off):
   return sorted_arr[index] if index > -1 else sorted_arr[0] - 1
 
 
-def sorted_permutations(mat, num_perms):
+def sorted_permutations(mat, num_perms, verbose=True):
   """
   :param mat:
   :param num_perms:
@@ -81,6 +81,8 @@ def sorted_permutations(mat, num_perms):
   num_rows, num_cols = mat.shape
 
   for perm in range(num_perms):
+    if verbose:
+      print "perm number %s out of %s" % (perm + 1, num_perms)
     row_indexes = range(num_rows)
     np.random.shuffle(row_indexes)
     for col_ix in range(num_cols):
