@@ -22,6 +22,11 @@ def sorted_permutations(mat, num_perms):
   :param mat:
   :param num_perms:
   :return corr_maxes:
+  >>> x = np.array([[1, 2, 3], [2, 3, 1]]).T
+  >>> num_perms = 15 # 6 possible combos but to handle repeats
+  >>> corr_maxes = set(sorted_permutations(x, num_perms))
+  >>> expected = set((-.5, .5, 1))
+  >>> assert(corr_maxes == expected)
   """
   maxes = np.zeros(num_perms)
   num_rows, num_cols = mat.shape
