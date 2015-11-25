@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.stats.stats import pearsonr
 
 
 def main_part():
@@ -56,13 +57,8 @@ def corr_with_shuffle(mat, shuffle_indexes, col_index):
   >>> assert(np.all(y == expected))
   """
   col_shuffled = mat[shuffle_indexes, col_index]
-  num_cols = mat.shape[1]
-  corrs = np.zeros(num_cols)
 
-  for col_ix in range(num_cols):
-    corrs[col_ix] = np.corrcoef(mat[:, col_ix], col_shuffled)[0][1]
-
-  return corrs
+  return np.corrcoef(mat.T, col_shuffled)[-1,:-1]
 
 
 if __name__ == "__main__":
