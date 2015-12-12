@@ -5,9 +5,6 @@ import numpy as np
 def main_part(output_file='labels.txt'):
     adj_mat = np.loadtxt('roi_adjacency.txt', delimiter=',')
 
-    is_valid = verify_valid_adj_mat(adj_mat)
-    assert is_valid[0], 'adj matrix not valid, roi %s' % is_valid[1] + " " + str(is_valid[2])
-
     labels = apply_labels(adj_mat)
 
     is_valid = verify_valid_labels(adj_mat, labels)
@@ -64,13 +61,9 @@ def update_labels(roi_ix, adj_mat, labels):
     >>> assert(np.all(expected == labels))
     """
 
-    roi_neighbors_cond = adj_mat[:, roi_ix] > 0
-
-    if roi_ix == 3:
-        print(np.flatnonzero(roi_neighbors_cond))
-
-    if roi_ix == 38:
-        print(np.flatnonzero(roi_neighbors_cond))
+    my_neighbors = adj_mat[roi_ix, :] > 0
+    people_who_call_me_neighbor = adj_mat[:, roi_ix] > 0
+    roi_neighbors_cond = np.logical_or(my_neighbors, people_who_call_me_neighbor)
 
     roi_neighbors_labels = labels[roi_neighbors_cond]
 
@@ -128,30 +121,6 @@ def verify_valid_labels(adj_mat, labels):
             print(np.flatnonzero(neighbors))
 
         return (False, roi_ix, same_neighbors()) if label in neighbor_labels else is_valid(roi_ix+1)
-
-    return is_valid()
-
-
-def verify_valid_adj_mat(adj_mat):
-    """
-    >>> import numpy as np
-    >>> x = np.array([[0, 1], [1, 0]])
-    >>> assert verify_valid_adj_mat(x)[0]
-    >>> x[1][0] = 0
-    >>> assert not verify_valid_adj_mat(x)[0]
-    """
-    num_rois = adj_mat.shape[1]
-
-    def is_valid(roi_ix=0):
-        if roi_ix == num_rois:
-            return (True, None)
-
-        neighbors_cond = adj_mat[:, roi_ix] > 0
-        neighbors = np.flatnonzero(neighbors_cond)
-
-        mismatch_cond = adj_mat[roi_ix, neighbors_cond] == 0
-
-        return (False, roi_ix, neighbors[mismatch_cond]) if np.any(mismatch_cond) else is_valid(roi_ix+1)
 
     return is_valid()
 
