@@ -34,10 +34,11 @@ def update_labels(roi_ix, adj_mat, labels):
     >>> expected = np.array([0, 1, 0, 2])
     >>> assert(np.all(expected == labels))
     """
-    roi_neighbors = adj_mat[:, roi_ix]
+    roi_neighbors = adj_mat[:, roi_ix] > 0
     for n in np.flatnonzero(roi_neighbors):
-        all_neighbors = adj_mat[:, n] + roi_neighbors
-        label = get_new_label(labels[all_neighbors>0])
+        n_neighbors = adj_mat[:, n] > 0
+        all_neighbors = np.logical_or(roi_neighbors, n_neighbors)
+        label = get_new_label(labels[all_neighbors])
         labels[n] = label
 
 
