@@ -7,7 +7,7 @@ def main_part(output_file='labels.txt'):
     labels = apply_labels(adj_mat)
 
     if output_file is not None:
-        np.savetxt(output_file, labels, delimiter=',')
+        np.savetxt(output_file, labels, delimiter=',', fmt='%d')
 
     return labels
 
