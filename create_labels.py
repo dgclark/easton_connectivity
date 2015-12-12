@@ -4,13 +4,16 @@ import numpy as np
 
 def main_part(output_file='labels.txt'):
     adj_mat = np.loadtxt('roi_adjacency.txt', delimiter=',')
-    assert verify_valid_adj_mat(adj_mat), 'adj matrix not valid'
+
+    is_valid = verify_valid_adj_mat(adj_mat)
+    assert is_valid[0], 'adj matrix not valid, roi %s' % is_valid[1] + " " + str(is_valid[2])
 
     labels = apply_labels(adj_mat)
 
     is_valid = verify_valid_labels(adj_mat, labels)
 
-    assert is_valid[0], "roi %s shares labels with neighbor(s): " % is_valid[1] + " " + str(is_valid[2])
+    assert is_valid[0], "roi %s shares label with neighbor(s): " % is_valid[1] + " " + str(is_valid[2]) \
+                        + " label: " + str(labels[is_valid[1]])
 
     if output_file is not None:
         np.savetxt(output_file, labels, delimiter=',', fmt='%d')
@@ -19,6 +22,17 @@ def main_part(output_file='labels.txt'):
 
 
 def apply_labels(adj_mat):
+    """
+    >>> import numpy as np
+    >>> adj_mat = np.zeros((4, 4))
+    >>> neighbors = [(0, 3), (0, 1)]
+    >>> for n in neighbors:
+    ...  adj_mat[n] = 1
+    ...  adj_mat[n[::-1]] = 1
+    >>> labels = apply_labels(adj_mat)
+    >>> expected = np.array([1, 2, 1, 2])
+    >>> assert(np.all(expected==labels))
+    """
     num_rois = adj_mat.shape[1]
     labels = np.zeros(num_rois, dtype=int)
     for roi_ix in range(num_rois):
@@ -37,35 +51,31 @@ def update_labels(roi_ix, adj_mat, labels):
     ...  adj_mat[n[::-1]] = 1
     >>> labels = np.zeros(4)
     >>> update_labels(0, adj_mat, labels)
-    >>> expected = np.array([1, 2, 0, 3])
+    >>> expected = np.array([1, 0, 0, 0])
+    >>> assert(np.all(expected == labels))
+    >>> update_labels(1, adj_mat, labels)
+    >>> expected = np.array([1, 2, 0, 0])
+    >>> assert(np.all(expected == labels))
+    >>> update_labels(2, adj_mat, labels)
+    >>> expected = np.array([1, 2, 1, 0])
+    >>> assert(np.all(expected == labels))
+    >>> update_labels(3, adj_mat, labels)
+    >>> expected = np.array([1, 2, 1, 2])
     >>> assert(np.all(expected == labels))
     """
 
     roi_neighbors_cond = adj_mat[:, roi_ix] > 0
-    roi_label = labels[roi_ix]
 
-    roi_neighbors_labels = lambda: labels[roi_neighbors_cond]
+    if roi_ix == 3:
+        print(np.flatnonzero(roi_neighbors_cond))
 
-    if roi_ix == 108:
-        import pdb
-        pdb.set_trace()
+    if roi_ix == 38:
+        print(np.flatnonzero(roi_neighbors_cond))
 
-    if roi_label==0:
-        roi_label = get_new_label(roi_neighbors_labels())
-        labels[roi_ix] = roi_label
+    roi_neighbors_labels = labels[roi_neighbors_cond]
 
-    roi_neighbors = np.flatnonzero(roi_neighbors_cond)
-
-    for n in roi_neighbors:
-        n_label = labels[n]
-        if n_label == 0:
-            all_labels_cond = np.logical_or(adj_mat[:, n] > 0, roi_neighbors_cond)
-            all_labels_cond[roi_ix] = True
-            all_labels = labels[all_labels_cond]
-            labels[n] = get_new_label(all_labels)
-
-    assert roi_label not in labels[roi_neighbors_cond], "label: %s, roi: %s, labels" % \
-                                               (roi_label, roi_ix) + str(roi_neighbors_labels())
+    roi_label = get_new_label(roi_neighbors_labels)
+    labels[roi_ix] = roi_label
 
 
 def get_new_label(labels):
@@ -112,7 +122,11 @@ def verify_valid_labels(adj_mat, labels):
         label = labels[roi_ix]
         neighbor_labels = labels[neighbors]
 
-        same_neighbors = lambda: np.flatnonzero(neighbor_labels == label)
+        same_neighbors = lambda: np.flatnonzero(neighbors)[neighbor_labels == label]
+
+        if roi_ix == 3:
+            print(np.flatnonzero(neighbors))
+
         return (False, roi_ix, same_neighbors()) if label in neighbor_labels else is_valid(roi_ix+1)
 
     return is_valid()
@@ -128,7 +142,7 @@ def verify_valid_adj_mat(adj_mat):
     """
     num_rois = adj_mat.shape[1]
 
-    def is_valid(roi_ix = 0):
+    def is_valid(roi_ix=0):
         if roi_ix == num_rois:
             return (True, None)
 
