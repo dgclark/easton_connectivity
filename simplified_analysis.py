@@ -6,13 +6,51 @@ import pandas as pd
 import strong_rois
 
 
-def main_part(f_name, field, num_perms, verbose=True):
+def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_dict=None):
 
-    low_score_ids, high_score_ids = split_ids(f_name, field)
+    subjects_dict = {}
+    subjects_dict['low'], subjects_dict['high'] = split_ids(f_name, field)
+    rois = pd.read_csv("ROI_matrix.txt", sep="\t")
+    roi_cols = rois.columns[3:]
 
-    sorted_perms = lambda ids: sorted_perms_in_ids(ids, num_perms, verbose)
+    ret = {}
 
-    return {'low':sorted_perms(low_score_ids), 'high':sorted_perms(high_score_ids)}
+    def get_subject_rois(subject_ids):
+        id_rows = rois.id.isin(subject_ids)
+        return rois.loc[id_rows, roi_cols].get_values()
+
+    def calc_roi_corrs(subject_rois):
+        cov = np.corrcoef(subject_rois.T)
+
+        num_rois = len(roi_cols)
+        assert cov.shape == (num_rois, num_rois)
+
+        return pd.DataFrame(cov,
+                            index=roi_cols,
+                            columns=roi_cols)
+
+    def calc_permutations(subject_rois, subject_type):
+        if permutations_dict is None:
+            sorted_permutations = strong_rois.sorted_permutations(subject_rois, num_perms, verbose)
+        else:
+            sorted_permutations = permutations_dict[subject_type]
+
+        return sorted_permutations
+
+    for subject_type, subject_ids in subjects_dict.items():
+        subject_rois = get_subject_rois(subject_ids)
+
+        sorted_permutations = calc_permutations(subject_rois, subject_type)
+
+        roi_corrs = calc_roi_corrs(subject_rois)
+
+        ret[subject_type] = {}
+        ret[subject_type]['valid_connections'] = \
+            strong_rois.connections_above(sorted_permutations, cut_off, roi_corrs)
+        ret[subject_type]['orig'] = roi_corrs
+        ret[subject_type]['sorted_permutations']=sorted_permutations
+
+    return ret
 
 
 def verify_length_does_not_impact_thresh(f_name, field, num_samples, num_perms, cut_off, verbose=True):
@@ -87,10 +125,3 @@ def split_most_even(values):
         above = np.logical_or(above, meds)
 
     return (below, above)
-
-
-def sorted_perms_in_ids(ids, num_perms, verbose):
-    rois = pd.read_csv("ROI_matrix.txt", sep="\t")
-    rois_with_valid_id = rois.loc[rois.id.isin(ids), rois.columns[3:]].get_values()
-
-    return strong_rois.sorted_permutations(rois_with_valid_id, num_perms, verbose)
