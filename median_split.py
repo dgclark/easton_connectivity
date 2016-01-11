@@ -3,7 +3,7 @@ from __future__ import division
 import numpy as np
 import pandas as pd
 
-import strong_rois
+import perm_analysis
 
 
 def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_dict=None):
@@ -31,7 +31,7 @@ def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_
 
     def calc_permutations(subject_rois, subject_type):
         if permutations_dict is None:
-            sorted_permutations = strong_rois.sorted_permutations(subject_rois, num_perms, verbose)
+            sorted_permutations = perm_analysis.sorted_permutations(subject_rois, num_perms, verbose)
         else:
             sorted_permutations = permutations_dict[subject_type]
 
@@ -46,7 +46,7 @@ def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_
 
         ret[subject_type] = {}
         ret[subject_type]['valid_connections'] = \
-            strong_rois.connections_above(sorted_permutations, cut_off, roi_corrs)
+            perm_analysis.connections_above(sorted_permutations, cut_off, roi_corrs)
         ret[subject_type]['orig'] = roi_corrs
         ret[subject_type]['sorted_permutations']=sorted_permutations
 
@@ -64,7 +64,7 @@ def verify_length_does_not_impact_thresh(f_name, field, num_samples, num_perms, 
     more_count = len(more_ids)
     less_count = num_low_ids + num_high_ids - more_count
 
-    calc_cutoff = lambda ids: strong_rois.cutoff_value(
+    calc_cutoff = lambda ids: perm_analysis.cutoff_value(
         sorted_perms_in_ids(ids, num_perms, verbose), cut_off)
 
     i = 0
