@@ -3,7 +3,7 @@ from __future__ import division
 import numpy as np
 
 def main_part(output_file='labels.txt'):
-    adj_mat = np.loadtxt('roi_adjacency.txt', delimiter=',')
+    adj_mat = np.loadtxt('data/roi_adjacency.txt', delimiter=',')
 
     labels = apply_labels(adj_mat)
 

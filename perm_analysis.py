@@ -5,7 +5,7 @@ import pandas as pd
 
 
 def main_part(num_perms=3, cut_off=.9, output_file=None, verbose=True):
-  data = pd.read_csv("ROI_matrix.txt", sep="\t")
+  data = pd.read_csv("data/ROI_matrix.txt", sep="\t")
 
   is_normal = np.logical_or(data.dx=='nc', data.dx=='aami')
   normals = data[is_normal]

@@ -10,7 +10,7 @@ def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_
 
     subjects_dict = {}
     subjects_dict['low'], subjects_dict['high'] = split_ids(f_name, field)
-    rois = pd.read_csv("ROI_matrix.txt", sep="\t")
+    rois = pd.read_csv("data/ROI_matrix.txt", sep="\t")
     roi_cols = rois.columns[3:]
 
     ret = {}
@@ -51,32 +51,6 @@ def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_
         ret[subject_type]['sorted_permutations']=sorted_permutations
 
     return ret
-
-
-def verify_length_does_not_impact_thresh(f_name, field, num_samples, num_perms, cut_off, verbose=True):
-    low_score_ids, high_score_ids = split_ids(f_name, field)
-
-    num_low_ids = len(low_score_ids)
-    num_high_ids = len(high_score_ids)
-
-    more_ids = low_score_ids if num_low_ids > num_high_ids else high_score_ids
-
-    more_count = len(more_ids)
-    less_count = num_low_ids + num_high_ids - more_count
-
-    calc_cutoff = lambda ids: perm_analysis.cutoff_value(
-        sorted_perms_in_ids(ids, num_perms, verbose), cut_off)
-
-    i = 0
-    cutoffs = np.zeros(num_samples)
-    for i in range(num_samples):
-        if verbose:
-            print "%s sample out of %s" % (i, num_samples)
-        ids = np.random.choice(more_ids, less_count, replace=False)
-        cutoffs[i] = calc_cutoff(ids)
-
-    return calc_cutoff(more_ids), cutoffs
-
 
 
 def split_ids(f_name, field):
