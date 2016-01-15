@@ -74,3 +74,24 @@ def correct_rois_for_nuisance(output_f=None):
         normalized_rois.to_csv(output_f)
 
     return normalized_rois
+
+
+def load_rois():
+    return pd.read_csv("data/ROI_matrix.txt", sep="\t")
+
+
+def calc_roi_corrs(rois=None):
+    rois = load_rois().iloc[:, 3:] if rois is None else rois
+    roi_cols = rois.columns
+
+    cov = np.corrcoef(rois.T)
+
+    num_rois = len(roi_cols)
+    assert cov.shape == (num_rois, num_rois)
+
+    return pd.DataFrame(cov,
+                        index=roi_cols,
+                        columns=roi_cols)
+
+def apply_both(fn, lows, highs):
+    return fn(lows), fn(highs)

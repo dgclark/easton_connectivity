@@ -53,8 +53,8 @@ def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_
     return ret
 
 
-def split_ids(f_name, field):
-    data = pd.read_csv(f_name)
+def split_ids(f_name='data/animal_scores.csv', field='raw'):
+    data = pd.read_csv(f_name) if isinstance(f_name, str) else f_name
     values = data[field]
 
     below, above = split_most_even(values)
