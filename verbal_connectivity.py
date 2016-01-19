@@ -7,6 +7,7 @@ import pandas as pd
 import median_split
 import utils
 
+
 def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
     rois = utils.correct_rois_for_nuisance().filter(like='normalized')
 
@@ -16,8 +17,9 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
 
     def create_return_dict():
         ret = dict(low=[], high=[])
-        def update(field, val):
-            ret[field].append(val)
+
+        def update(f, val):
+            ret[f].append(val)
         return ret, update
 
     graphs, update_graphs = create_return_dict()
@@ -32,8 +34,8 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
         animal_score_samples = animal_scores.loc[sample_rows, :]
         assert animal_score_samples.shape == (num_subjects, num_cols)
 
-        get_subj_rois = lambda ids: \
-            rois.loc[rois.index.isin(ids), :]
+        def get_subj_rois(ids):
+            return rois.loc[rois.index.isin(ids), :]
 
         low_ids, high_ids = median_split.split_ids(animal_score_samples, field)
 
@@ -65,20 +67,14 @@ def corr_to_graph(roi_corrs):
     >>> assert graph['A']['B'] == {'weight': corrs['B']['A']} #upper triangular
     >>> assert len(graph) == 2
     """
-    g = nx.Graph()
+    roi_corrs['source'] = roi_corrs.index
+    num_rois = roi_corrs.shape[0]
+    roi_corrs = pd.melt(roi_corrs, id_vars='source')
+    roi_corrs.rename(columns={'variable': 'target', 'value': 'weight'}, inplace=True)
+    assert roi_corrs.shape == (num_rois*num_rois, 3)
 
-    is_lower = lambda r, c: c > r
-    row_cols = [(r, c)
-                for rx, r in enumerate(roi_corrs.index)
-                for cx, c in enumerate(roi_corrs.columns)
-                if is_lower(rx, cx)]
-
-    for (r, c) in row_cols:
-            val = roi_corrs[c][r]
-            g.add_edge(r, c, {'weight': val})
-
-    return g
-
+    return nx.from_pandas_dataframe(roi_corrs, 'source', 'target',
+                                    edge_attr=['weight'])
 
 
 def calc_graph_metrics(graph):

@@ -84,14 +84,13 @@ def calc_roi_corrs(rois=None):
     rois = load_rois().iloc[:, 3:] if rois is None else rois
     roi_cols = rois.columns
 
-    cov = np.corrcoef(rois.T)
+    rois_corr = rois.corr()
 
     num_rois = len(roi_cols)
-    assert cov.shape == (num_rois, num_rois)
+    assert rois_corr.shape == (num_rois, num_rois)
 
-    return pd.DataFrame(cov,
-                        index=roi_cols,
-                        columns=roi_cols)
+    return rois_corr
+
 
 def apply_both(fn, lows, highs):
     return fn(lows), fn(highs)
