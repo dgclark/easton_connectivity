@@ -7,7 +7,7 @@ import pandas as pd
 import median_split
 import utils
 
-def calc_graphs(graph_count=1000, verbose=None, include_corrs=False):
+def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
     rois = utils.correct_rois_for_nuisance().filter(like='normalized')
 
     animal_scores = pd.read_csv('data/animal_scores.csv')
@@ -23,11 +23,11 @@ def calc_graphs(graph_count=1000, verbose=None, include_corrs=False):
     graphs, update_graphs = create_return_dict()
     corrs, update_corrs = create_return_dict()
 
-    gen_graph = lambda corr: nx.Graph(corr.get_values())
-
+    last_print = -1
     for i in range(graph_count):
-        if verbose:
-            print "%s out of %s" % (i+1, graph_count)
+        if (i - last_print) == verbose:
+            last_print = i
+            print "number %s out of %s" % (i + 1, graph_count)
         sample_rows = np.random.choice(num_subjects, num_subjects)
         animal_score_samples = animal_scores.loc[sample_rows, :]
         assert animal_score_samples.shape == (num_subjects, num_cols)
@@ -45,7 +45,7 @@ def calc_graphs(graph_count=1000, verbose=None, include_corrs=False):
             update_corrs('low', low_corrs)
             update_corrs('high', high_corrs)
 
-        low_graph, high_graph = utils.apply_both(gen_graph,
+        low_graph, high_graph = utils.apply_both(corr_to_graph,
                                                  low_corrs, high_corrs)
 
         update_graphs('low', low_graph)
@@ -54,5 +54,37 @@ def calc_graphs(graph_count=1000, verbose=None, include_corrs=False):
     return dict(graphs=graphs, corrs=corrs) if include_corrs else graphs
 
 
+def corr_to_graph(roi_corrs):
+    """
+    >>> import pandas as pd
+    >>> import numpy as np
+    >>> corrs = pd.DataFrame(np.random.rand(2,2))
+    >>> corrs.index = ['A', 'B']
+    >>> corrs.columns = ['A', 'B']
+    >>> graph = corr_to_graph(corrs)
+    >>> assert graph['A']['B'] == {'weight': corrs['B']['A']} #upper triangular
+    >>> assert len(graph) == 2
+    """
+    g = nx.Graph()
+
+    is_lower = lambda r, c: c > r
+    row_cols = [(r, c)
+                for rx, r in enumerate(roi_corrs.index)
+                for cx, c in enumerate(roi_corrs.columns)
+                if is_lower(rx, cx)]
+
+    for (r, c) in row_cols:
+            val = roi_corrs[c][r]
+            g.add_edge(r, c, {'weight': val})
+
+    return g
+
+
+
 def calc_graph_metrics(graph):
     raise NotImplementedError
+
+
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
