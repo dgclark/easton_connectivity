@@ -9,7 +9,9 @@ import utils
 
 
 def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
-    rois = utils.correct_rois_for_nuisance().filter(like='normalized')
+    n = '_normalized'
+    rois = utils.correct_rois_for_nuisance().filter(like=n)
+    rois.rename(columns={c: c[:-len(n)] for c in rois.columns}, inplace=True)
 
     animal_scores = pd.read_csv('data/animal_scores.csv')
     num_subjects, num_cols = animal_scores.shape
