@@ -69,7 +69,6 @@ def correct_rois_for_nuisance(output_f=None):
     assert normalized_rois.shape[0] == num_subjects
     verify_index(normalized_rois)
 
-
     if output_f is not None:
         normalized_rois.to_csv(output_f)
 

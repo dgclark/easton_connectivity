@@ -125,7 +125,6 @@ def verify_valid_labels(adj_mat, labels):
     return is_valid()
 
 
-
 if __name__ == "__main__":
     import doctest
     doctest.testmod()

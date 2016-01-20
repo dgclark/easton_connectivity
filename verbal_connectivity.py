@@ -16,7 +16,7 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
     field = 'raw'
 
     def create_return_dict():
-        ret = dict(low=[], high=[])
+        ret = dict(low=[], high=[], median=[])
 
         def update(f, val):
             ret[f].append(val)
@@ -37,7 +37,7 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
         def get_subj_rois(ids):
             return rois.loc[rois.index.isin(ids), :]
 
-        low_ids, high_ids = median_split.split_ids(animal_score_samples, field)
+        low_ids, high_ids, median = median_split.split_ids(animal_score_samples, field)
 
         low_rois, high_rois = utils.apply_both(get_subj_rois, low_ids, high_ids)
 
@@ -46,12 +46,14 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
         if include_corrs:
             update_corrs('low', low_corrs)
             update_corrs('high', high_corrs)
+            update_corrs('median', median)
 
         low_graph, high_graph = utils.apply_both(corr_to_graph,
                                                  low_corrs, high_corrs)
 
         update_graphs('low', low_graph)
         update_graphs('high', high_graph)
+        update_graphs('median', median)
 
     return dict(graphs=graphs, corrs=corrs) if include_corrs else graphs
 

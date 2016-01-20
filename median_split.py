@@ -9,7 +9,7 @@ import perm_analysis
 def main_part(f_name, field, num_perms, cut_off=.95, verbose=True, permutations_dict=None):
 
     subjects_dict = {}
-    subjects_dict['low'], subjects_dict['high'] = split_ids(f_name, field)
+    subjects_dict['low'], subjects_dict['high'], median = split_ids(f_name, field)
     rois = pd.read_csv("data/ROI_matrix.txt", sep="\t")
     roi_cols = rois.columns[3:]
 
@@ -57,12 +57,12 @@ def split_ids(f_name='data/animal_scores.csv', field='raw'):
     data = pd.read_csv(f_name) if isinstance(f_name, str) else f_name
     values = data[field]
 
-    below, above = split_most_even(values)
+    below, above, median = split_most_even(values)
 
     low_score_ids = data[below].id
     high_score_ids = data[above].id
 
-    return low_score_ids, high_score_ids
+    return low_score_ids, high_score_ids, median
 
 
 def split_most_even(values):
@@ -93,9 +93,9 @@ def split_most_even(values):
 
     num_below = np.sum(below)
     num_above = np.sum(above)
-    if (num_below < num_above):
+    if num_below < num_above:
         below = np.logical_or(below, meds)
     else:
         above = np.logical_or(above, meds)
 
-    return (below, above)
+    return below, above, median
