@@ -28,6 +28,10 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
     corrs, update_corrs = create_return_dict()
 
     last_print = -1
+
+    def corr_to_graph_curried(roi_corrs):
+        return corr_to_graph(roi_corrs, include_corrs)
+
     for i in range(graph_count):
         if (i - last_print) == verbose:
             last_print = i
@@ -50,7 +54,7 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
             update_corrs('high', high_corrs)
             update_corrs('median', median)
 
-        low_graph, high_graph = utils.apply_both(corr_to_graph,
+        low_graph, high_graph = utils.apply_both(corr_to_graph_curried,
                                                  low_corrs, high_corrs)
 
         update_graphs('low', low_graph)
@@ -60,7 +64,7 @@ def calc_graphs(graph_count=1000, verbose=0, include_corrs=False):
     return dict(graphs=graphs, corrs=corrs) if include_corrs else graphs
 
 
-def corr_to_graph(roi_corrs):
+def corr_to_graph(roi_corrs, copy_corrs=False):
     """
     >>> import pandas as pd
     >>> import numpy as np
@@ -71,14 +75,23 @@ def corr_to_graph(roi_corrs):
     >>> assert graph['A']['B'] == {'weight': corrs['B']['A']} #upper triangular
     >>> assert len(graph) == 2
     """
+    roi_corrs = create_convertible_corr_df(roi_corrs, copy_corrs)
+    return nx.from_pandas_dataframe(roi_corrs, 'source', 'target',
+                                    edge_attr=['weight'])
+
+
+def create_convertible_corr_df(roi_corrs, copy_corrs=False):
+    if copy_corrs:
+        roi_corrs = roi_corrs.copy()
+
     roi_corrs['source'] = roi_corrs.index
     num_rois = roi_corrs.shape[0]
+
     roi_corrs = pd.melt(roi_corrs, id_vars='source')
     roi_corrs.rename(columns={'variable': 'target', 'value': 'weight'}, inplace=True)
     assert roi_corrs.shape == (num_rois*num_rois, 3)
 
-    return nx.from_pandas_dataframe(roi_corrs, 'source', 'target',
-                                    edge_attr=['weight'])
+    return roi_corrs
 
 
 def calc_graph_metrics(graph):
