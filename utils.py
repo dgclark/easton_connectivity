@@ -93,3 +93,14 @@ def calc_roi_corrs(rois=None):
 
 def apply_both(fn, lows, highs):
     return fn(lows), fn(highs)
+
+
+def memoize(fn):
+    cache = {}
+
+    def wrapped(*args):
+        if args not in cache:
+            cache[args] = fn(*args)
+        return cache[args]
+
+    return wrapped
