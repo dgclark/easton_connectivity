@@ -1,7 +1,0 @@
-GLOBAL
-small worldness
-rich club structure
-efficiency
-
-LOCAL
-betweenness centrality, clustering coefficient/transitivity, degree
