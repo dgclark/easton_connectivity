@@ -253,6 +253,12 @@ function compare_global_vals(low::DataFrame,
 end
 
 
+function left_right_to_num(left_right::ASCIIString)
+  bias::Int64 = startswith(left_right, "L") ? 0 : 100
+  bias + parse(Int64, left_right[2:end])
+end
+
+
 function get_stats(low_df::DataFrame,
                    high_df::DataFrame,
                    node::ASCIIString,
@@ -269,11 +275,14 @@ function compare_local_vals(low_df::DataFrame,
 
   data_cols = delete!(Set(names(high_df)), :node)
 
-  low_mean::DataFrame = aggregate(low_df, :node, mean)
-  high_mean::DataFrame = aggregate(high_df, :node, mean)
+  function calc_mean_df(df::DataFrame, old_suf::ASCIIString, new_suf::ASCIIString)
+    df_mean::DataFrame = aggregate(df, :node, mean)
+    rename_suffix(df_mean, old_suf, new_suf, data_cols)
+    df_mean
+  end
 
-  rename_suffix(low_mean, "_mean", "_low_mean", data_cols)
-  rename_suffix(high_mean, "_mean", "_high_mean", data_cols)
+  low_mean::DataFrame = calc_mean_df(low_df, "_mean", "_low_mean")
+  high_mean::DataFrame = calc_mean_df(high_df, "_mean", "_high_mean")
 
   stats::DataFrame = begin
     nodes::Array{ASCIIString} = low_mean[:node]
@@ -306,8 +315,8 @@ function compare_local_vals(low_df::DataFrame,
   end
 
   on_node = (df1::DataFrame, df2::DataFrame) -> join(df1, df2, on=:node)
-  on_node(on_node(low_mean, high_mean), stats)
-
+  ret::DataFrame = on_node(on_node(low_mean, high_mean), stats)
+  sort!(ret, cols=[:node], by=left_right_to_num)
 end
 
 
