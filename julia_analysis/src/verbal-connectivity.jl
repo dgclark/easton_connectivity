@@ -226,7 +226,7 @@ function compare_global_vals(low::DataFrame,
   low_mean::DataFrame = aggregate(low, mean)
   high_mean::DataFrame = aggregate(high, mean)
   low_std::DataFrame = aggregate(low, std)
-  high_std::DataFrame = aggregate(low, std)
+  high_std::DataFrame = aggregate(high, std)
 
   data_cols::Set{Symbol} = Set(names(high))
   map([(low_mean, "_mean", "_mean_low"), (high_mean, "_mean", "_mean_high"),
@@ -253,13 +253,13 @@ function compare_global_vals(low::DataFrame,
 end
 
 
-function get_stats(df1::DataFrame,
-                   df2::DataFrame,
+function get_stats(low_df::DataFrame,
+                   high_df::DataFrame,
                    node::ASCIIString,
                    col::Symbol)
-  d1::Array{Float64} = df1[ df1[:node] .== node, col]
-  d2::Array{Float64} = df2[ df2[:node] .== node, col]
-  t::OneSampleTTest = OneSampleTTest(d1, d2)
+  low::Array{Float64} = low_df[ low_df[:node] .== node, col]
+  high::Array{Float64} = high_df[ high_df[:node] .== node, col]
+  t::OneSampleTTest = OneSampleTTest(high, low)
   (pvalue(t), t.t)
 end
 
@@ -270,7 +270,7 @@ function compare_local_vals(low_df::DataFrame,
   data_cols = delete!(Set(names(high_df)), :node)
 
   low_mean::DataFrame = aggregate(low_df, :node, mean)
-  high_mean::DataFrame = aggregate(low_df, :node, mean)
+  high_mean::DataFrame = aggregate(high_df, :node, mean)
 
   rename_suffix(low_mean, "_mean", "_low_mean", data_cols)
   rename_suffix(high_mean, "_mean", "_high_mean", data_cols)
