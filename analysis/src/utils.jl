@@ -50,10 +50,6 @@ function correct_rois_for_nuisance(output_f::ASCIIString="")
 
   @assert size(all_data) == (num_subjects, num_cols)
 
-  function verify_id(df)
-    @assert all(df[:id] == all_data[:id])
-  end
-
   function inner_data(df)
     Matrix(
       df[filter(c -> c != :id, names(df))]
@@ -64,19 +60,16 @@ function correct_rois_for_nuisance(output_f::ASCIIString="")
   rois_df::DataFrame = all_data[:, vcat(roi_cols, :id)]
   rois_data::Matrix{Float64} = inner_data(rois_df)
   @assert size(rois_df, 1) == num_subjects
-  verify_id(rois_df)
 
   cols = [:edu, :age, :sex, :id]
   nuisance = all_data[cols]
   nuisance[:age_x_sex] = dot(nuisance[:age], nuisance[:sex])
   nuisance[:mean_roi] = mean(rois_data, 2)[:]
   @assert size(nuisance) == (num_subjects, 6)
-  verify_id(nuisance)
 
   normalized_rois = begin
-    norm_roi_data::Matrix{Float64} = calc_residuals(
-      inner_data(nuisance),
-      rois_data)
+    norm_roi_data::Matrix{Float64} =
+      calc_residuals(inner_data(nuisance), rois_data)
     ret = DataFrame(norm_roi_data)
     rename!(c -> symbol(c, "_normalized"), ret)
     ret[:id] = nuisance[:id]
