@@ -9,17 +9,26 @@ function id_inner_join(a::DataFrame, b::DataFrame)
   join(a, b, kind=:inner, on=:id)
 end
 
-function calc_residuals(independent, dependent)
-  num_ind_subjects, num_ind_features = size(independent)
-  num_dep_subjects, num_dep_features = size(dependent)
-  @assert num_ind_subjects == num_dep_subjects
-  num_subjects = num_ind_subjects
+function calc_residuals(predictions::Vector{Symbol}, predictors::Vector{Symbol},
+                        dataframe::DataFrame)
+  num_subjects = size(dataframe, 1)
+  num_predictors = length(predictors)
+  num_predictions = length(predictions)
 
-  sln = \(independent, dependent)
-  @assert size(sln) == (num_ind_features, num_dep_features)
+  predictor_mat = Matrix(dataframe[predictors])
+  prediction_mat = Matrix(dataframe[predictions])
 
-  residuals = dependent - independent * sln
-  @assert size(residuals) == (num_subjects, num_dep_features)
+  #prediction_mat = predictor_mat * coeffs
+  coeffs::Matrix{Float64} = \(predictor_mat, prediction_mat)
+  @assert size(coeffs) == (num_predictors, num_predictions)
+
+  residuals_mat::Matrix{Float64} = prediction_mat - predictor_mat * coeffs
+  @assert size(residuals_mat) == (num_subjects, num_predictions)
+
+  residuals = DataFrame(residuals_mat)
+  name_lookup = Dict{Symbol, Symbol}([v => predictions[i]
+                                      for (i, v) in enumerate(names(residuals))])
+  rename!(residuals, name_lookup)
 
   residuals
 end
@@ -30,7 +39,7 @@ function is_roi_col(col_name)
 end
 
 
-function correct_rois_for_nuisance(output_f::ASCIIString="")
+function correct_rois_for_covars(output_f::ASCIIString="", covars=[:age, :sex, :edu])
   meta_data = readtable(data_f("animal_scores.csv"))
   roi_data = readtable(data_f("ROI_matrix.txt"), separator='\t')
 
@@ -56,35 +65,27 @@ function correct_rois_for_nuisance(output_f::ASCIIString="")
       )
   end
 
+
+  function with_id(cols::Vector{Symbol})
+    push!(copy(cols), :id)
+  end
+
   roi_cols::Vector{Symbol} = filter(c-> is_roi_col(string(c)), names(all_data))
-  rois_df::DataFrame = all_data[:, vcat(roi_cols, :id)]
-  rois_data::Matrix{Float64} = inner_data(rois_df)
+  rois_df::DataFrame = all_data[:, with_id(roi_cols)]
   @assert size(rois_df, 1) == num_subjects
 
-  cols = [:edu, :age, :sex, :id]
-  nuisance = all_data[cols]
-  nuisance[:age_x_sex] = dot(nuisance[:age], nuisance[:sex])
-  nuisance[:mean_roi] = mean(rois_data, 2)[:]
-  @assert size(nuisance) == (num_subjects, 6)
-
   normalized_rois = begin
-    norm_roi_data::Matrix{Float64} =
-      calc_residuals(inner_data(nuisance), rois_data)
-    ret = DataFrame(norm_roi_data)
+    ret::DataFrame = calc_residuals(roi_cols, covars, all_data)
     rename!(c -> symbol(c, "_normalized"), ret)
-    ret[:id] = nuisance[:id]
+    ret[:id] = all_data[:id]
     ret
   end
   @assert size(normalized_rois) == size(rois_df)
-  verify_id(normalized_rois)
 
-  normalized_and_orig_rois = begin
-    tmp = id_inner_join(normalized_rois, rois_df)
-    id_inner_join(nuisance, tmp)
-  end
+  normalized_and_orig_rois = id_inner_join(normalized_rois,
+                                           all_data[:, with_id(roi_cols)])
 
   @assert size(normalized_and_orig_rois, 1) == num_subjects
-  verify_id(normalized_and_orig_rois)
 
   if !isempty(output_f)
     writetable(output_f, normalized_and_orig_rois)
