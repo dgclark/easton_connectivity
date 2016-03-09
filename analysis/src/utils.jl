@@ -71,8 +71,6 @@ function correct_rois_for_covars(output_f::ASCIIString="", covars=[:age, :sex, :
   end
 
   roi_cols::Vector{Symbol} = filter(c-> is_roi_col(string(c)), names(all_data))
-  rois_df::DataFrame = all_data[:, with_id(roi_cols)]
-  @assert size(rois_df, 1) == num_subjects
 
   normalized_rois = begin
     ret::DataFrame = calc_residuals(roi_cols, covars, all_data)
@@ -80,7 +78,7 @@ function correct_rois_for_covars(output_f::ASCIIString="", covars=[:age, :sex, :
     ret[:id] = all_data[:id]
     ret
   end
-  @assert size(normalized_rois) == size(rois_df)
+  @assert size(normalized_rois) == (num_subjects, length(roi_cols) + 1)
 
   normalized_and_orig_rois = id_inner_join(normalized_rois,
                                            all_data[:, with_id(roi_cols)])
