@@ -39,7 +39,13 @@ function is_roi_col(col_name)
 end
 
 
-function correct_rois_for_covars(output_f::ASCIIString="", covars=[:age, :sex, :edu])
+function correct_rois_for_covars(output_f::ASCIIString="",
+                                 covars::Vector{Symbol}=[:age, :sex, :edu, :total_gray],
+                                 covar_preprocess= function(df, roi_cols)
+                                   row_sum = r -> sum([v for (s, v) in r])
+                                   df[:total_gray] = Float64[row_sum(r) for r in eachrow(df[roi_cols])]
+                                 end
+                                 )
   meta_data = readtable(data_f("animal_scores.csv"))
   roi_data = readtable(data_f("ROI_matrix.txt"), separator='\t')
 
@@ -73,6 +79,7 @@ function correct_rois_for_covars(output_f::ASCIIString="", covars=[:age, :sex, :
   roi_cols::Vector{Symbol} = filter(c-> is_roi_col(string(c)), names(all_data))
 
   normalized_rois = begin
+    covar_preprocess(all_data, roi_cols)
     ret::DataFrame = calc_residuals(roi_cols, covars, all_data)
     rename!(c -> symbol(c, "_normalized"), ret)
     ret[:id] = all_data[:id]
