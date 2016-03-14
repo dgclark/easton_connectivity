@@ -5,6 +5,30 @@ function data_f(src_f)
 end
 
 
+function linear_reg(x::AbstractMatrix{Float64}, y::AbstractMatrix{Float64})
+  # y = x * beta
+  num_rows_x, num_features_x = size(x)
+  num_rows, num_features_y = size(y)
+  @assert num_rows_x == num_rows
+
+  centered_x, centered_y = map((x,y)) do arr
+    arr .- mean(arr, 1)
+  end
+
+  beta1 = \(centered_x, centered_y)
+  @assert size(beta1) == (num_features_x, num_features_y)
+
+  beta0 = begin
+    scale_beta = mean(x, 1) * beta1
+    @assert length(scale_beta) == num_features_y
+    mean(y, 1) .- scale_beta
+  end
+  @assert length(beta0) == num_features_y
+
+  Dict(:beta0 => beta0, :beta1 => beta1)
+end
+
+
 function id_inner_join(a::DataFrame, b::DataFrame)
   join(a, b, kind=:inner, on=:id)
 end
@@ -34,36 +58,50 @@ function calc_residuals(predictions::Vector{Symbol}, predictors::Vector{Symbol},
 end
 
 
-function is_roi_col(col_name)
-  ismatch(r"[L|R][0-9]+$", col_name)
+function is_roi_col(col_name; normalized::Bool=false)
+  match_r = normalized ? r"[L|R][0-9]+_normalized$" : r"[L|R][0-9]+$"
+  ismatch(match_r, col_name)
 end
 
+function get_roi_cols(df::DataFrame; normalized::Bool=false)
+  function match(s::Symbol)
+    is_roi_col(string(s), normalized=normalized)
+  end
+  filter(match, names(df))
+end
 
-function correct_rois_for_covars(output_f::ASCIIString="",
-                                 covars::Vector{Symbol}=[:age, :sex, :edu, :total_gray],
-                                 covar_preprocess= function(df, roi_cols)
-                                   row_sum = r -> sum([v for (s, v) in r])
-                                   df[:total_gray] = Float64[row_sum(r) for r in eachrow(df[roi_cols])]
-                                 end
+default_covars = Symbol[:age, :sex, :edu, :total_gray]
+
+function calc_total_gray!(df::DataFrame)
+  roi_cols::Vector{Symbol} = get_roi_cols(df)
+  row_sum = r -> sum([v for (s, v) in r])
+  df[:total_gray] = Float64[row_sum(r) for r in eachrow(df[roi_cols])]
+end
+
+function correct_rois_for_covars(;output_f::ASCIIString="",
+                                 covars::Vector{Symbol}= default_covars,
+                                 covar_preprocess::Function = calc_total_gray!
                                  )
   meta_data = readtable(data_f("animal_scores.csv"))
   roi_data = readtable(data_f("ROI_matrix.txt"), separator='\t')
+  handedness_data = readtable(data_f("handedness.csv"))
 
-  num_subjects = min(size(roi_data, 1), size(meta_data, 1))
-  num_cols = length(union(names(roi_data), names(meta_data)))
+  num_cols = length(union(names(roi_data), names(meta_data), names(handedness_data)))
 
   all_data = begin
     ret = join(meta_data, roi_data, kind = :inner, on = :id)
+    ret = join(handedness_data, ret, kind= :inner, on = :id)
     dupe_ending = "_1"
     for dupe in filter(c -> endswith(string(c), dupe_ending), names(ret))
       orig = symbol(replace(string(dupe), dupe_ending, ""))
       @assert all(ret[orig] == ret[dupe])
       delete!(ret, dupe)
     end
-    ret
+    ret[ret[:handedness] .== 2, :]
   end
 
-  @assert size(all_data) == (num_subjects, num_cols)
+  num_subjects = size(all_data, 1)
+  @assert size(all_data, 2) == num_cols
 
   function inner_data(df)
     Matrix(
@@ -79,7 +117,7 @@ function correct_rois_for_covars(output_f::ASCIIString="",
   roi_cols::Vector{Symbol} = filter(c-> is_roi_col(string(c)), names(all_data))
 
   normalized_rois = begin
-    covar_preprocess(all_data, roi_cols)
+    covar_preprocess(all_data)
     ret::DataFrame = calc_residuals(roi_cols, covars, all_data)
     rename!(c -> symbol(c, "_normalized"), ret)
     ret[:id] = all_data[:id]
