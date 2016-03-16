@@ -5,6 +5,14 @@ function data_f(src_f)
   "../data/$src_f"
 end
 
+function permutes(arr::AbstractArray, i::Int64=length(arr))
+  if i == 0
+      []
+  else
+    append!(collect(combinations(arr, i)), permutes(arr, i-1))
+  end
+end
+
 
 function linear_reg{xT, yT}(x::AbstractMatrix{xT}, y::AbstractMatrix{yT})
   # y = x * beta

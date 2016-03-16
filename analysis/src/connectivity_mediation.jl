@@ -32,11 +32,8 @@ function calc_is_mci!(df::DataFrame)
   df[:is_mci] = Float64[r[:dx] == "mci" for r in eachrow(df)]
 end
 
-pre_process_def = mk_pre_process_fn()
-pre_process_mci = mk_pre_process_fn([calc_is_mci!], add_to_default([:is_mci]))
 pre_process_mci_conv = mk_pre_process_fn([calc_is_mci!], add_to_default([:is_mci, :conv]))
 pre_process_no_cov = mk_pre_process_fn(Function[], Symbol[])
-pre_process_no_age = mk_pre_process_fn(Function[], [:sex, :edu, :total_gray])
 
 
 function flu_formula(var, covars=Symbol[])
@@ -63,8 +60,9 @@ end
 
 function get_roi_corrs()
 
-  pre_processes = Function[pre_process_def, pre_process_mci, pre_process_mci_conv,
-                           pre_process_no_cov, pre_process_no_age]
+  pre_processes = [mk_pre_process_fn([calc_is_mci!], e)
+                   for e in permutes([:age, :sex, :edu, :total_gray, :is_mci, :conv])]
+  append!(pre_processes, [pre_process_no_cov])
 
 
   # This approach would give us three different graphs and we might be able
