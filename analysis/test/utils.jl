@@ -34,3 +34,18 @@ lr = linear_reg(x, y)
 @test_approx_eq lr[:beta1][1] y1_beta1
 @test_approx_eq lr[:beta0][2] y2_beta0
 @test_approx_eq lr[:beta1][2] y2_beta1
+
+x = [1. 1]'
+y1 = [1. 3]'
+#ypred is [2, 2]
+res = calc_residuals(x, y1)
+@test res' == [-1. 1.]
+
+y2 = [1. 4]'
+#ypred is [2.5, 2.5]
+res = calc_residuals(x, y2)
+@test res' == [-1.5 1.5]
+
+y = hcat(y1, y2)
+res = calc_residuals(x, y)
+@test res == [-1. -1.5; 1. 1.5]

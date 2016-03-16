@@ -1,67 +1,123 @@
 include("utils.jl")
-
+using DataFrames
+using GLM
+using PValueAdjust
 
 
 # 1: covariates: age, sex, education, and total gray matter
 # 2: run it again adding MCI as a covariate,
 # 3: adding MCI and conversion status as covariates.
 
-correct = correct_rois_for_covars
+function add_to_default(add_covars::Vector{Symbol})
+  covars = copy(default_covars)
+  append!(covars, add_covars)
+end
+
+function mk_pre_process_fn(add_fns::Vector{Function}=Function[],
+                           covars::Vector{Symbol}=default_covars)
+
+  function pre_proc(df::DataFrame)
+    calc_total_gray!(df)
+    df[:flu] = Vector{Float64}(df[:raw])
+    for fn = add_fns
+      fn(df)
+    end
+    return covars
+  end
+
+  return pre_proc
+end
 
 function calc_is_mci!(df::DataFrame)
   df[:is_mci] = Float64[r[:dx] == "mci" for r in eachrow(df)]
 end
 
-function covar_preprocess(df::DataFrame)
-  calc_total_gray!(df)
-  calc_is_mci!(df)
+pre_process_def = mk_pre_process_fn()
+pre_process_mci = mk_pre_process_fn([calc_is_mci!], add_to_default([:is_mci]))
+pre_process_mci_conv = mk_pre_process_fn([calc_is_mci!], add_to_default([:is_mci, :conv]))
+pre_process_no_cov = mk_pre_process_fn(Function[], Symbol[])
+pre_process_no_age = mk_pre_process_fn(Function[], [:sex, :edu, :total_gray])
+
+
+function flu_formula(var, covars=Symbol[])
+  fm_str = length(covars) > 0 ? string("flu ~ $var + ", join(covars, " + ")) : "flu ~ $var"
+  eval(parse(fm_str))
 end
 
-function correct_mci()
-  correct_rois_for_covars(covars=[:age, :sex, :edu, :total_gray, :is_mci],
-                          covar_preprocess=covar_preprocess)
-end
 
-function correct_mci_conv()
-  correct_rois_for_covars(covars=[:age, :sex, :edu, :total_gray, :is_mci, :conv],
-                          covar_preprocess=covar_preprocess)
-end
+function view_covar_corrs()
+  all_data = load_all_data()
+  covars = pre_process_mci_conv(all_data)
 
-corrections = Function[correct, correct_mci, correct_mci_conv]
+  for c in covars
+    fm = flu_formula(c)
+    flu_r = lm(fm, all_data)
+    ct = coeftable(flu_r)
+    betacoef, tscore, pvalue = ct.mat[2, [1, 3, 4]]
 
-# This approach would give us three different graphs and we might be able
-# to say which edges are more likely to be disease specific.
-
-# btw, 288 * 287 = 82,656
-
-score_data = readtable("../data/animal_scores.csv")
-
-for correction = corrections
-
-  all_data = join(correction(), score_data, on=:id, kind=:inner)
-  # Iterate through ROIs, checking to see if each ROI is associated with fluency
-  # for gm_a in rois
-  #    flu ~ beta1 * gm_a + covariates
-  # end
-
-  roi_cols::Vector{Symbol} = get_roi_cols(all_data, normalized=true)
-  num_rois = length(roi_cols)
-
-  roi_data::Matrix{Float64} = Matrix(all_data[roi_cols])
-
-  flu::Vector{Float64} = Vector{Float64}(all_data[:raw])
-  beta_flu::DataFrame = begin
-    #flu = roi_data * beta_flus
-    ret::Vector{Float64} = \(roi_data .- mean(roi_data, 1), flu - mean(flu))
-    @assert length(ret) == num_rois
-    ret_df = DataFrame(betacoef= ret)#, rois=roi_cols)
-    #ret_df[sig_rois(ret_df), :]
+    println("$c pvalue: $pvalue")
   end
 
-  # Use FDR to decide which ROIs to keep, put in list sig_rois
-  # Also have to keep beta1 for each ROI.
+end
 
 
+function get_roi_corrs()
+
+  pre_processes = Function[pre_process_def, pre_process_mci, pre_process_mci_conv,
+                           pre_process_no_cov, pre_process_no_age]
+
+
+  # This approach would give us three different graphs and we might be able
+  # to say which edges are more likely to be disease specific.
+
+  # btw, 288 * 287 = 82,656
+
+  flu_corrs_ret = DataFrame[]
+
+  for pre_process = pre_processes
+
+    # Iterate through ROIs, checking to see if each ROI is associated with fluency
+    # for gm_a in rois
+    #    flu ~ beta1 * gm_a + covariates
+    # end
+    all_data::DataFrame = load_all_data()
+    covars::Vector{Symbol} = pre_process(all_data)
+
+    roi_cols = get_roi_cols(all_data)
+    num_rois = length(roi_cols)
+
+    flu_corrs = begin
+      zeros_rois = () ->  zeros(Float64, num_rois)
+      pvalues = zeros_rois()
+      tscores = zeros_rois()
+      betacoefs = zeros_rois()
+
+      for (ix, roi) = enumerate(roi_cols)
+        fm = flu_formula(roi, covars)
+        flu_r = lm(fm, all_data)
+        ct = coeftable(flu_r)
+        betacoefs[ix], tscores[ix], pvalues[ix] = ct.mat[2, [1, 3, 4]]
+      end
+
+      ret = DataFrame(roi=roi_cols, pvalue=pvalues, tscore=tscores, betacoef=betacoefs)
+      ret[:pvalue_adj] = padjust(ret[:pvalue], BenjaminiHochberg)
+
+      println(covars)
+      println("minimum pvalue: $(minimum(ret[:pvalue]))")
+      # Use FDR to decide which ROIs to keep, put in list sig_rois
+      # Also have to keep beta1 for each ROI.
+      println("minimum p-adj: $(minimum(ret[:pvalue_adj]))")
+      alpha=.05
+      println("p count less than $alpha: $(sum(ret[:pvalue] .< alpha))")
+      println("p_adj count less than $alpha: $(sum(ret[:pvalue_adj] .< alpha))")
+
+      ret
+    end
+
+    append!(flu_corrs_ret, [flu_corrs])
+  end
+
+  return flu_corrs_ret
 
 end
 

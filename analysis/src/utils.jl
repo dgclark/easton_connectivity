@@ -1,11 +1,12 @@
 using DataFrames
+using Distributions
 
 function data_f(src_f)
   "../data/$src_f"
 end
 
 
-function linear_reg(x::AbstractMatrix{Float64}, y::AbstractMatrix{Float64})
+function linear_reg{xT, yT}(x::AbstractMatrix{xT}, y::AbstractMatrix{yT})
   # y = x * beta
   num_rows_x, num_features_x = size(x)
   num_rows, num_features_y = size(y)
@@ -25,7 +26,16 @@ function linear_reg(x::AbstractMatrix{Float64}, y::AbstractMatrix{Float64})
   end
   @assert length(beta0) == num_features_y
 
-  Dict(:beta0 => beta0, :beta1 => beta1)
+  res = calc_residuals(beta0, beta1, x, y)
+
+  sd = sqrt(sum( res .^ 2 ))
+  se = sd/sqrt(num_rows - 1)
+  se_mean = sd * sqrt( sum( x.^2)/(length(x) * sum( (x - mean(x)).^2)))
+  t_mean = beta0/se_mean
+  t = beta1/se
+  tdist = TDist(num_rows - 1)
+
+  Dict(:beta0 => beta0, :beta1 => beta1, :se=>se, :se_mean=>se_mean, :t => t, :t_mean => t_mean)
 end
 
 
@@ -33,20 +43,33 @@ function id_inner_join(a::DataFrame, b::DataFrame)
   join(a, b, kind=:inner, on=:id)
 end
 
+function calc_residuals{xT, yT}(beta0::AbstractMatrix{Float64},
+                                beta1::AbstractMatrix{Float64},
+                                x::AbstractMatrix{xT},
+                                y::AbstractMatrix{yT})
+  y_pred = begin
+    @assert size(beta1) == (size(x, 2), size(y, 2))
+    @assert size(beta0) == (1, size(y, 2))
+    beta0 .+ x * beta1
+  end
+  y - y_pred
+end
+
+function calc_residuals{xT, yT}(x::AbstractMatrix{xT}, y::AbstractMatrix{yT})
+  lr = linear_reg(x, y)
+  beta0, beta1 = lr[:beta0], lr[:beta1]
+  calc_residuals(beta0, beta1, x, y)
+end
+
 function calc_residuals(predictions::Vector{Symbol}, predictors::Vector{Symbol},
                         dataframe::DataFrame)
   num_subjects = size(dataframe, 1)
-  num_predictors = length(predictors)
   num_predictions = length(predictions)
 
   predictor_mat = Matrix(dataframe[predictors])
   prediction_mat = Matrix(dataframe[predictions])
 
-  #prediction_mat = predictor_mat * coeffs
-  coeffs::Matrix{Float64} = \(predictor_mat, prediction_mat)
-  @assert size(coeffs) == (num_predictors, num_predictions)
-
-  residuals_mat::Matrix{Float64} = prediction_mat - predictor_mat * coeffs
+  residuals_mat = calc_residuals(predictor_mat, prediction_mat)
   @assert size(residuals_mat) == (num_subjects, num_predictions)
 
   residuals = DataFrame(residuals_mat)
@@ -78,10 +101,7 @@ function calc_total_gray!(df::DataFrame)
   df[:total_gray] = Float64[row_sum(r) for r in eachrow(df[roi_cols])]
 end
 
-function correct_rois_for_covars(;output_f::ASCIIString="",
-                                 covars::Vector{Symbol}= default_covars,
-                                 covar_preprocess::Function = calc_total_gray!
-                                 )
+function load_all_data()
   meta_data = readtable(data_f("animal_scores.csv"))
   roi_data = readtable(data_f("ROI_matrix.txt"), separator='\t')
   handedness_data = readtable(data_f("handedness.csv"))
@@ -100,8 +120,16 @@ function correct_rois_for_covars(;output_f::ASCIIString="",
     ret[ret[:handedness] .== 2, :]
   end
 
-  num_subjects = size(all_data, 1)
   @assert size(all_data, 2) == num_cols
+
+  return all_data
+end
+
+
+function correct_rois_for_covars(;output_f::ASCIIString="",
+                                 covars::Vector{Symbol}= default_covars,
+                                 covar_preprocess::Function = calc_total_gray!
+                                 )
 
   function inner_data(df)
     Matrix(
@@ -114,6 +142,9 @@ function correct_rois_for_covars(;output_f::ASCIIString="",
     push!(copy(cols), :id)
   end
 
+  all_data = load_all_data()
+  num_subjects = size(all_data, 1)
+
   roi_cols::Vector{Symbol} = filter(c-> is_roi_col(string(c)), names(all_data))
 
   normalized_rois = begin
@@ -125,8 +156,7 @@ function correct_rois_for_covars(;output_f::ASCIIString="",
   end
   @assert size(normalized_rois) == (num_subjects, length(roi_cols) + 1)
 
-  normalized_and_orig_rois = id_inner_join(normalized_rois,
-                                           all_data[:, with_id(roi_cols)])
+  normalized_and_orig_rois = id_inner_join(normalized_rois, all_data)
 
   @assert size(normalized_and_orig_rois, 1) == num_subjects
 
