@@ -1,8 +1,8 @@
 using Base.Test
+using PyCall
 
 include("test-helpers.jl")
-src = getsrc("utils.jl")
-include(src)
+@include_src "utils.jl"
 
 @test is_roi_col("L123")
 @test !is_roi_col("L23a")
@@ -49,3 +49,10 @@ res = calc_residuals(x, y2)
 y = hcat(y1, y2)
 res = calc_residuals(x, y)
 @test res == [-1. -1.5; 1. 1.5]
+
+
+x = DataFrame(a=[1, 2, 3], b=[4, 5, 6])
+x[:a_1] = x[:a]
+delete_dupes!(x, "_1")
+@test !in(:a_1, names(x))
+@test in(:a, names(x))

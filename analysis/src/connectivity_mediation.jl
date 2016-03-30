@@ -43,7 +43,6 @@ end
 
 
 function view_covar_corrs()
-  all_data = load_all_data()
   covars = pre_process_mci_conv(all_data)
 
   for c in covars
@@ -58,11 +57,7 @@ function view_covar_corrs()
 end
 
 
-function get_roi_corrs()
-
-  pre_processes = [mk_pre_process_fn([calc_is_mci!], e)
-                   for e in permutes([:age, :sex, :edu, :total_gray, :is_mci, :conv])]
-  append!(pre_processes, [pre_process_no_cov])
+function get_roi_flu_coefs(pre_process = mk_pre_process_fn())
 
 
   # This approach would give us three different graphs and we might be able
@@ -70,15 +65,10 @@ function get_roi_corrs()
 
   # btw, 288 * 287 = 82,656
 
-  flu_corrs_ret = DataFrame[]
-
-  for pre_process = pre_processes
-
     # Iterate through ROIs, checking to see if each ROI is associated with fluency
     # for gm_a in rois
     #    flu ~ beta1 * gm_a + covariates
     # end
-    all_data::DataFrame = load_all_data()
     covars::Vector{Symbol} = pre_process(all_data)
 
     roi_cols = get_roi_cols(all_data)
@@ -112,10 +102,19 @@ function get_roi_corrs()
       ret
     end
 
-    append!(flu_corrs_ret, [flu_corrs])
-  end
+  return flu_corrs
 
-  return flu_corrs_ret
+end
+
+function get_mediated_rois()
+  betas::DataFrame = get_roi_flu_coefs()[[:betacoef, :roi]]
+  rois::DataFrame = all_data[betas[:roi]]
+end
+
+
+function get_roi_corrs()
+
+  mediated_rois::DataFrame = get_mediated_rois()
 
 end
 

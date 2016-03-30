@@ -1,13 +1,9 @@
 using Base.Test
+using HypothesisTests
 
+include("test-helpers.jl")
+@include_src "verbal-connectivity.jl"
 
-src = begin
-  curr_folder = pwd()
-  proj_folder = dirname(curr_folder)
-  joinpath(proj_folder, "src", "verbal-connectivity.jl")
-end
-
-include(src)
 
 corrs = [1.0 0.7;
          0.7 1.0]
@@ -88,31 +84,70 @@ expected = [0.2 -0.1 -0.2;
 
 
 ###Compare Vals
-d1 = Dict{Symbol, Float64}[Dict(:a => 3, :b=>6), Dict(:a => 5, :b=>8)]
-d2 = Dict{Symbol, Float64}[Dict(:a => 1, :b=>3), Dict(:a => 3, :b=>5)]
-cmp = (x::Vector{Float64}, y::Vector{Float64}) -> mean(x) - mean(y)
+d_low = DataFrame(a=[3, 5.])
+d_high = DataFrame(a=[1., 3])
+get_quants(k::Symbol) = quantile(d_high[k] - d_low[k], [.025, .975])
+a_2dot5, a_97dot5 = get_quants(:a)
 
-cmpks = Symbol[:a]
-@test compare_global_vals(d1, d2, cmpks, cmp) == Dict(:a => 2.0)
+expected = DataFrame(
+  a_mean_low = mean(d_low[:a]),
+  a_mean_high = mean(d_high[:a]),
+  a_std_low = std(d_low[:a]),
+  a_std_high = std(d_high[:a]),
+  a_2dot5 = get_quants(:a)[1],
+  a_97dot5 = get_quants(:a)[2]
+  )
 
-cmpks = Symbol[:a, :b]
-@test compare_global_vals(d1, d2, cmpks, cmp) == Dict(:a => 2.0, :b => 3.0)
-
-nodes = ["1", "2"]
-mk_df = (a, b) -> DataFrame(nodes=copy(nodes), a=a, b=b)
-df1s = DataFrame[mk_df([1.0, 2.0], [4.0, 5.0]), mk_df([3.0, 4.0], [6.0, 7.0])]
-df2s = DataFrame[mk_df([3.0, 5.0], [3.0, 3.0]), mk_df([5.0, 7.0], [5.0, 5.0])]
-
-expected = DataFrame(nodes=nodes, a=[-2.0, -3.0], b=[1.0, 2.0])
-
-cmpks=Symbol[:a, :b]
-@test compare_local_vals(df1s, df2s, nodes, cmpks, cmp) == expected
+@test compare_global_vals(d_low, d_high) == expected
 
 
-df1 = DataFrame(node=["a", "b"], degree=[.1, .2], cluster=[.3, .4])
-df2 = DataFrame(node=["a", "b"], degree=[.2, .3], cluster=[.1, .2])
-expected = DataFrame(node=["a", "b"], degree_mean=[.15, .25],
-                     cluster_mean=[.2, .3])
-actual = calc_local_stats([df1, df2], [df2])
-@test  within_arr(expected[:degree_mean], actual[:degree_mean])
-@test  within_arr(expected[:cluster_mean], actual[:cluster_mean])
+nodes = ["L1", "L1", "L1", "R1", "R1", "R1"]
+
+info = Dict()
+
+@enum LowHigh low high
+@enum Measure degree cluster
+
+info[low] = Dict()
+info[high] = Dict()
+
+update_info(lh::LowHigh, m::Measure,
+            l1_arr::AbstractVector{Float64},
+            r1_arr::AbstractVector{Float64}) = info[lh][m] = Dict(
+  "L1"=>collect(l1_arr), "R1"=>collect(r1_arr))
+
+get_all(lh::LowHigh, m::Measure) = [info[lh][m]["L1"];  info[lh][m]["R1"]]
+
+update_info(low, degree, .1:.1:.3, .2:.1:.4)
+update_info(high, degree, .7:.1:.9, .1:.1:.3)
+
+update_info(low, cluster, .7:.1:.9, .1:.1:.3)
+update_info(high, cluster, .1:.1:.3, .2:.1:.4)
+
+df_low = DataFrame(node=nodes, degree=get_all(low, degree), cluster=get_all(low, cluster))
+df_high = DataFrame(node=nodes, degree=get_all(high, degree), cluster=get_all(high, cluster))
+
+function node_info(n::AbstractString, m::Measure)
+  low_arr, high_arr = info[low][m][n], info[high][m][n]
+  low_mn, high_mn = mean(low_arr), mean(high_arr)
+  t::OneSampleTTest = OneSampleTTest(high_arr, low_arr)
+  low_mn, high_mn, pvalue(t), t.t
+end
+
+L1_degree_info = node_info("L1", degree)
+R1_degree_info = node_info("R1", degree)
+L1_cluster_info = node_info("L1", cluster)
+R1_cluster_info = node_info("R1", cluster)
+
+expected = DataFrame(node=["L1", "R1"],
+                     degree_low_mean=[L1_degree_info[1], R1_degree_info[1]],
+                     cluster_low_mean=[L1_cluster_info[1], R1_cluster_info[1]],
+                     degree_high_mean=[L1_degree_info[2], R1_degree_info[2]],
+                     cluster_high_mean=[L1_cluster_info[2], R1_cluster_info[2]],
+                     cluster_p = [L1_cluster_info[3], R1_cluster_info[3]],
+                     cluster_t = [L1_cluster_info[4], R1_cluster_info[4]],
+                     degree_p = [L1_degree_info[3], R1_degree_info[3]],
+                     degree_t = [L1_degree_info[4], R1_degree_info[4]]
+                     )
+
+@test compare_local_vals(df_low, df_high) == expected

@@ -109,28 +109,32 @@ function calc_total_gray!(df::DataFrame)
   df[:total_gray] = Float64[row_sum(r) for r in eachrow(df[roi_cols])]
 end
 
-function load_all_data()
+
+function delete_dupes!(df::DataFrame, dupe_ending::AbstractString)
+  for dupe in filter(c -> endswith(string(c), dupe_ending), names(df))
+    orig = symbol(replace(string(dupe), dupe_ending, ""))
+    @assert all(df[orig] == df[dupe])
+    delete!(df, dupe)
+  end
+end
+
+
+all_data = begin
   meta_data = readtable(data_f("animal_scores.csv"))
   roi_data = readtable(data_f("ROI_matrix.txt"), separator='\t')
   handedness_data = readtable(data_f("handedness.csv"))
 
   num_cols = length(union(names(roi_data), names(meta_data), names(handedness_data)))
 
-  all_data = begin
-    ret = join(meta_data, roi_data, kind = :inner, on = :id)
-    ret = join(handedness_data, ret, kind= :inner, on = :id)
-    dupe_ending = "_1"
-    for dupe in filter(c -> endswith(string(c), dupe_ending), names(ret))
-      orig = symbol(replace(string(dupe), dupe_ending, ""))
-      @assert all(ret[orig] == ret[dupe])
-      delete!(ret, dupe)
-    end
-    ret[ret[:handedness] .== 2, :]
-  end
+  ret = join(meta_data, roi_data, kind = :inner, on = :id)
+  ret = join(handedness_data, ret, kind= :inner, on = :id)
+  delete_dupes!(ret, "_1")
 
-  @assert size(all_data, 2) == num_cols
+  ret[ret[:handedness] .== 2, :]
 
-  return all_data
+  @assert size(ret, 2) == num_cols
+
+  ret
 end
 
 
@@ -150,7 +154,6 @@ function correct_rois_for_covars(;output_f::ASCIIString="",
     push!(copy(cols), :id)
   end
 
-  all_data = load_all_data()
   num_subjects = size(all_data, 1)
 
   roi_cols::Vector{Symbol} = filter(c-> is_roi_col(string(c)), names(all_data))

@@ -220,8 +220,7 @@ function rename_suffix(df::DataFrame,
 end
 
 
-function compare_global_vals(low::DataFrame,
-                             high::DataFrame)
+function compare_global_vals(low::DataFrame, high::DataFrame)
 
   low_mean::DataFrame = aggregate(low, mean)
   high_mean::DataFrame = aggregate(high, mean)
