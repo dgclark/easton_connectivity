@@ -13,20 +13,6 @@ function add_to_default(add_covars::Vector{Symbol})
   append!(covars, add_covars)
 end
 
-function mk_pre_process_fn(add_fns::Vector{Function}=Function[],
-                           covars::Vector{Symbol}=default_covars)
-
-  function pre_proc(df::DataFrame)
-    calc_total_gray!(df)
-    df[:flu] = Vector{Float64}(df[:raw])
-    for fn = add_fns
-      fn(df)
-    end
-    return covars
-  end
-
-  return pre_proc
-end
 
 function calc_is_mci!(df::DataFrame)
   df[:is_mci] = Float64[r[:dx] == "mci" for r in eachrow(df)]

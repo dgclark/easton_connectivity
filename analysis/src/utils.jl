@@ -132,7 +132,10 @@ all_data = begin
 
   ret[ret[:handedness] .== 2, :]
 
+
   @assert size(ret, 2) == num_cols
+
+  ret[:fluency] = Vector{Float64}(ret[:raw])
 
   ret
 end
@@ -198,4 +201,19 @@ end
 
 function apply_both(fn::Function, lows, highs)
   fn(lows), fn(highs)
+end
+
+
+function mk_pre_process_fn(add_fns::Vector{Function}=Function[],
+                           covars::Vector{Symbol}=default_covars)
+
+  function pre_proc(df::DataFrame)
+    calc_total_gray!(df)
+    for fn = add_fns
+      fn(df)
+    end
+    return covars
+  end
+
+  return pre_proc
 end
